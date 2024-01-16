@@ -1,23 +1,16 @@
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine
 import streamlit as st
 import pandas as pd
-import uuid
 from datetime import datetime
-import os.path
-import pathlib
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
+
+from model import Expense, Base
+from main import session
+
+import os
 
 
-from models import Expense
-
-
-# create an engine
-engine  = create_engine('sqlite:///expense_db.sqlite3')
-Session = sessionmaker(bind=engine)
-session = Session()
-
-
-def add_view():
+def add_expense():
         
     st.subheader("Add New Expense 📝")    
     # add expenses form
@@ -47,7 +40,7 @@ def add_view():
                               date_added=date_added, 
                               description=description)
                 
-                # print
+                # add to database
                 session.add(expense)
                 session.commit()
                 st.success("Data Added Successfully.")
@@ -55,16 +48,16 @@ def add_view():
                 st.error(f"Some error occured {e}")
 
 
-def delete_view():
+def delete_expense():
     st.markdown(" ### Delete Expense 📝")    
     # delete expenses form
     with st.form(key="delete_expense", clear_on_submit=True):
-        search_id = st.text_input(label="Enter Expense ID:")
+        expense_id = st.text_input(label="Enter Expense ID:")
         submit_button = st.form_submit_button(label="Delete Expense")
         
         if submit_button:
             # search for expense id
-            expense = session.query(Expense).filter(Expense.id == search_id).first()
+            expense = session.query(Expense).get(expense_id)
             
             if expense != None:
                 session.delete(expense)
@@ -75,28 +68,27 @@ def delete_view():
         
         
 
-def edit_view():
+def edit_expense():
     st.markdown(" ### Edit Expense 📝")    
     # edit expenses form
-    search_id = st.text_input(label="Enter Expense ID:")
+    expense_id = st.text_input(label="Enter Expense ID:")
     search_btn = st.button(label="Search ID")
         
     if search_btn:
         try:
             # search for expense id
-            expense = session.query(Expense).filter(Expense.id == search_id).first()
+            expense = session.query(Expense).get(expense_id)
             
             if expense != None:
                 # display form
                 with st.form(key="update_expense", clear_on_submit=True):
-                    title = st.text_input(label="Expense Title:", placeholder=expense.title)
-                    amount = st.number_input(label="Expense Amount:",placeholder=expense.amount)
-                    paid_to = st.text_input(label="Paid To:", placeholder=expense.paid_to)
+                    title = st.text_input(label="Expense Title:", value=expense.title)
+                    amount = st.number_input(label="Expense Amount:",value=expense.amount)
+                    paid_to = st.text_input(label="Paid To:", value=expense.paid_to)
                     category = st.selectbox(label="Expense Category:", 
                                             options=['Don\'t Specify', 'Feeding','Transportation','Others'],
                                             placeholder =expense.category)
-                    date_added = st.date_input(label="Date: ")
-                    description = st.text_area(label="Description (Optional):", placeholder=expense.description)
+                    description = st.text_area(label="Description (Optional):", value=expense.description)
                     
                     submit_button = st.form_submit_button(label="Update Expense")
                     
@@ -106,17 +98,13 @@ def edit_view():
                             st.warning("Field Cannot be Empty.")
                             st.stop()
                         
-                        expense.update({
-                            "title": title,
-                            "amount": amount,
-                            "paid_to": paid_to,
-                            "category": category,
-                            "date_added": date_added,
-                            "description": description,
-                            "updated_at": datetime.utcnow()
-                            })
+                        expense.title = title
+                        expense.amount = amount
+                        expense.paid_to = paid_to
+                        expense.category = category,
+                        expense.description = description
+                        expense.updated_at = datetime.utcnow()
                         
-                        # print
                         session.commit()
                         st.success("Data Updated Successfully.")
             else:
@@ -127,7 +115,7 @@ def edit_view():
                 
         
 
-def list_view():
+def list_expenses():
     """
     Display all expenses in a dataframe
     """
@@ -148,4 +136,5 @@ def list_view():
             })
             
     st.dataframe(df, hide_index=True, use_container_width=True)
+
 
